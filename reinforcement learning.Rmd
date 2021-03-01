@@ -1,0 +1,329 @@
+---
+title: "Reinforcement Learning: Markov Decision Process"
+author: "Ajeng Prastiwi, Wulan Andriyani"
+date: "`r format(Sys.Date(), '%B %e, %Y')`"
+output:
+  html_document:
+    df_print: paged
+    highlight: tango
+    theme: cosmo
+    toc: yes
+    toc_float:
+      collapsed: no
+  pdf_document:
+    toc: yes
+  word_document:
+    toc: yes
+---
+
+<style>
+body {
+text-align: justify}
+</style>
+
+```{r setup, include=FALSE}
+# clear-up the environment
+rm(list = ls())
+# chunk options
+knitr::opts_chunk$set(
+  message = FALSE,
+  warning = FALSE,
+  fig.align = "center",
+  comment = "#>"
+)
+options(scipen = 99)
+
+```
+
+# Introduction
+
+## Reinforcement Learning
+
+The main idea of reinforcement learning is learning based on reward or punishment like training your pet to do tricks: if your pet performs the trick you want, you provide treats as a reward, otherwise, you punish him by not treating him or providing the feed. An agent will learn from the environment by interacting with it and receiving rewards for performing actions. Reinforcement learning is suitable where information is limited, we need to learn our actions by interacting with the environment.
+
+```{r, echo = FALSE}
+knitr::include_graphics("assets/explainedd.png")
+```
+[Source picture](http://www.sra.vjti.info/blog/machine-learning/introduction-to-reinforcement-learning-in-2-minutes)
+
+Reinforcement learning is different from supervised learning. Supervised learning is learning from a labeled training dataset with guidance. Meanwhile, the objective of reinforcement learning is an agent interacts with its environment, performs actions, and learns by a trial-and-error method (can be learned to do better by receiving feedback from the environment).
+
+Reinforcement learning is also different from unsupervised learning. The term of unsupervised learning is about finding hidden structures in the collection of unlabeled data. The reason why people assume that reinforcement learning is a kind of unsupervised learning because it does not rely on examples of correct behavior, reinforcement learning is trying to maximize a reward signal instead of trying to find a hidden structure. We therefore consider reinforcement learning to be a third machine learning paradigm, alongside supervised learning and unsupervised learning and perhaps other paradigms as well [^1].
+
+
+Approaches to reinforcement learning[^2]:
+
+1. Value Based
+
+The objective is to optimize the function of value V (s). The value function is a function that informs us that the agent will obtain the maximum predicted future reward in each state. The value of each state is, beginning at that state, the cumulative amount of the reward an agent can expect to accumulate over the future.
+
+2. Policy Based
+
+In a policy-based RL method, you try to come up with such a policy that the action performed in every state helps you to gain maximum reward in the future.
+
+There are two types of policy:
+
+- **Deterministic**
+
+Deterministic policy maps state to action without uncertainty. It happens when you have a deterministic environment like a chess table
+
+- **Stochastic**
+
+Stochastic policy outputs a probability distribution over actions in a given state
+
+
+3. Model Based
+
+The agent will create a virtual model to performs for each environment
+
+
+## Markov Decision Process
+
+When the reinforcement learning setup decribed above is formulated with well-defined transition probabilities it constitutes a Markov decision process (MDP). Markov decision process defines the interaction between a learning agent and its environment in terms of states, actions, and rewards [^1].  MDP works with a probabilistic model of a sequential decision problem, where states can be perceived exactly, and the current state and action selected determine a probability distribution on future states. Essentially, the outcome of applying an action to a state depends only on the current action and state (and not on preceding actions or states) [^3].
+
+```{r, echo=FALSE, out.width="100%"}
+knitr::include_graphics("assets/introduction.png")
+```
+[Source](http://incompleteideas.net/book/bookdraft2017nov5.pdf)
+
+
+Elements of markov decision process:
+
+1. **State**
+
+the state of the agent in the environment
+
+2. **Action**
+
+Action is a set of actions which the agent can perform
+
+3. **Rewards**
+
+Rewards are the numerical values that the agent receives on performing some action at some states in the environment. The numerical value can be positive or negative based on the actions of the agent.
+
+4. **Environment**
+
+Where the agent learns and decides what actions to perform
+
+5. **Agent**
+
+Agent is the learner and decision maker
+
+## Application Markov Decision Process in various industry
+
+1. Optimizing marketing planning and budgeting
+
+Advertiser of the campaign with the different platform will present different responses. So companies need to optimize their marketing strategies.
+
+**States**: The allocation of an ads budgeting of the campaign
+
+**Actions**: The actions are limited to keeping the budgeting campaign or raising it to a higher limit band
+
+**Rewards**: Number of impression from the campaign
+
+2. Optimizing credit limit
+
+A company needs to decide how much credit to extend, taking into account the costs, incomes, and risks associated with each customer. 
+
+**States**: Number of credit limit
+
+**Actions**: The actions are limited to keeping the credit limit as is this period or raising it to a higher limit band
+
+**Rewards**: Customer's score
+
+3. Reducing wait time at a traffic intersection
+
+Decide the duration of the traffic light to maximize the number of cars passing the intersection without stopping
+
+**States**: Combination of color, duration of the traffic light and number of cars approaching the intersection in each direction
+
+**Actions**: Whether or not to change the traffic light
+
+**Rewards**: Number of cars passing the intersection in the next time step minus some sort of discount for the traffic blocked in the other direction.
+
+4. Decide how many patients to admit at the hospital
+
+The hospital needs to decide how many patients to admit at specified times, taking into account possible overflows and underutilization of capacity.
+
+**State**: The number of available beds
+
+**Actions**: The number of patients to admit
+
+**Rewards**: The number of patient recovered on that day which is a function of number of patients in the current state
+
+[More application of MDP](https://towardsdatascience.com/real-world-applications-of-markov-decision-process-mdp-a39685546026)
+
+# Learning Objective
+
+The goal of this article is to help you:
+
+- Understand concept of Reinforcement learning
+
+- Understand concept of Markov Decision Process
+
+- Application Markov Decision Process in various industry
+
+## Library
+
+```{r}
+library(markovchain)
+library(tidyverse)
+library(lubridate)
+library(MDPtoolbox)
+```
+
+
+# Case Example
+
+In this section, we present implementation of markov decision process for optimizing marketing budgeting.
+
+```{r}
+budget <- read.csv("data_input/MarketiBudget.csv")
+head(budget)
+```
+
+```{r}
+budget <- budget %>% 
+  filter(Campaign.Name == "campaign 1") %>% 
+  mutate(Day = ymd(Day),
+         Platform = factor(Platform),
+         campaign.start = dmy(campaign.start)) %>%
+  group_by(Day, Platform) %>% 
+  summarise(Reach = sum(Reach),
+            Impressions = sum(Impressions),
+            Amount.Spent.SGD = sum(Amount.Spent.SGD)) %>% 
+  ungroup() %>%
+  arrange(Platform) %>%
+  mutate(Reach = as.factor(ifelse(Reach <= 10000, "reach <= 10K", "reach > 10K")),
+         Impressions = as.factor(ifelse(Impressions <= 10000,
+                                        "impressions <= 10K",
+                                        ifelse(Impressions > 10000 & Impressions <= 55000,
+                                               "impressions > 10K - <= 55K",
+                                               "impressions > 55K"))),
+         Amount.Spent.SGD = as.factor(ifelse(Amount.Spent.SGD < 8,
+                                             "cost < 8 SGD",
+                                             ifelse(Amount.Spent.SGD >= 8 & Amount.Spent.SGD < 15,
+                                                    "cost >= 8 - <15 SGD",
+                                                    "cost >= 15 SGD"))),
+         name = paste(Platform, Reach, Impressions, Amount.Spent.SGD, sep = "; "))
+head(budget)
+```
+
+```{r}
+name <- table(budget$Platform, budget$Reach, budget$Impressions, budget$Amount.Spent.SGD) %>%
+  as.data.frame() %>% 
+  mutate(Var4 = factor(Var4, levels = c("cost < 8 SGD", "cost >= 8 - <15 SGD", "cost >= 15 SGD")),
+         name = paste(Var1, Var2, Var3, Var4, sep = "; ")) %>% 
+  arrange(Var4, Var1, Var2, Var3)
+head(name)
+```
+
+```{r}
+budget_wide <- budget %>% 
+  select(Day, Platform, name) %>% 
+  pivot_wider(names_from = Day, values_from = name) %>% 
+  select(-Platform)
+
+colnames(budget_wide) <- 1:12
+
+budget_wide
+```
+
+```{r}
+budget_diff <- rbind(budget_wide[, 1:2] %>%  rename(time1 = "1", time2 = "2"),
+      budget_wide[, 2:3] %>%  rename(time1 = "2", time2 = "3"),
+      budget_wide[, 3:4] %>%  rename(time1 = "3", time2 = "4"),
+      budget_wide[, 4:5] %>%  rename(time1 = "4", time2 = "5"),
+      budget_wide[, 5:6] %>%  rename(time1 = "5", time2 = "6"),
+      budget_wide[, 6:7] %>%  rename(time1 = "6", time2 = "7"),
+      budget_wide[, 7:8] %>%  rename(time1 = "7", time2 = "8"),
+      budget_wide[, 8:9] %>%  rename(time1 = "8", time2 = "9"),
+      budget_wide[, 9:10] %>%  rename(time1 = "9", time2 = "10"),
+      budget_wide[, 10:11] %>%  rename(time1 = "10", time2 = "11"),
+      budget_wide[, 11:12] %>%  rename(time1 = "11", time2 = "12"))
+head(budget_diff)
+```
+
+```{r}
+trans <- budget_diff %>% 
+  group_by(time1) %>% 
+  mutate(freq_time1 = n()) %>%
+  ungroup() %>%
+  group_by(time1, time2) %>% 
+  summarise(prob = n()/freq_time1) %>% 
+  ungroup() %>% 
+  distinct()
+head(trans)
+```
+
+```{r}
+trans <- data.frame(time1 = rep(name$name, times = 36), time2 = rep(name$name, each = 36)) %>%
+      mutate(time1 = as.factor(time1),
+             time2 = as.factor(time2)) %>% 
+      left_join(trans) %>% 
+      mutate(prob = replace_na(prob, 0))
+head(trans)
+```
+
+```{r}
+trans_matrix <- matrix(data = trans$prob, nrow = 36, ncol = 36)
+# trans_matrix[1:5, 1:5]
+# colnames(trans_matrix) <- unique(x$time1)
+# rownames(trans_matrix) <- unique(x$time2)
+```
+
+```{r}
+name <- name %>% 
+  mutate(reward = ifelse(Var2 == "reach > 10K" & Var4 == "cost < 8 SGD", 10,
+                         ifelse(Var2 == "reach > 10K" & Var4 == "cost >= 8 - <15 SGD", 8,
+                                ifelse(Var2 == "reach <= 10K" & Var4 == "cost < 8 SGD", 7,
+                                       ifelse(Var2 == "reach <= 10K" & Var4 == "cost >= 8 - <15 SGD", 5,
+                                              2)))))
+```
+
+```{r}
+reward_matrix <- matrix(data = name$reward, nrow = 36, ncol = 1)
+```
+
+```{r}
+diag(trans_matrix) <- ifelse(rowSums(trans_matrix) == 0, 1, diag(trans_matrix))
+```
+
+```{r}
+combine <- cbind(trans_matrix,reward_matrix[,1])
+down <- rbind(combine[1:12,], combine[1:24,])
+```
+
+```{r}
+trans_stay <- trans_matrix
+trans_down <- combine[, 1:36]
+
+reward_matrix <- cbind(reward_matrix, combine[, 37])
+
+dim(trans_stay); dim(trans_down); dim(reward_matrix)
+```
+
+```{r}
+action <- list(stay = trans_stay, down = trans_down)
+mdp_check(P = action, R = reward_matrix)
+mdp_policy <- mdp_policy_iteration(P = action, R = reward_matrix, discount = 0.99)
+mdp_value <- mdp_value_iteration(P = action, R = reward_matrix, discount = 0.99)
+```
+
+```{r}
+mdp_policy$policy
+mdp_value$policy
+```
+
+
+# Conclusion
+
+# Reference
+
+[^1]: [Reinforcement Learning: An Introduction](http://incompleteideas.net/book/bookdraft2017nov5.pdf)
+
+[^2]: [Introduction to Reinforcement Learning Markov Decision Process ](https://towardsdatascience.com/introduction-to-reinforcement-learning-markov-decision-process-44c533ebf8da)
+
+[^3]: [Reinforcement Learning Algorithms-an Intuitive Overview](https://smartlabai.medium.com/reinforcement-learning-algorithms-an-intuitive-overview-904e2dff5bbc)
+
+
